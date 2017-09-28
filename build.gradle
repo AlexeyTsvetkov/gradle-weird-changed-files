@@ -1,0 +1,62 @@
+plugins {
+    id 'com.gradle.build-scan' version '1.9'
+    id 'org.jetbrains.kotlin.jvm' version '1.1.50'
+}
+
+buildScan {
+    licenseAgreementUrl = 'https://gradle.com/terms-of-service'
+    licenseAgree = 'yes'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'com.google.guava:guava:12.0'
+    testCompile 'org.testng:testng:6.8'
+    compile "org.jetbrains.kotlin:kotlin-stdlib:1.1.50"
+}
+
+class PseudoCompileTask extends AbstractCompile {
+    @TaskAction
+    void execute(IncrementalTaskInputs inputs) {
+        if (!inputs.incremental) {
+            println("Inputs are not incremental")
+        } else {
+            println("Inputs are incremental")
+
+            println("Modified input files:")
+            inputs.outOfDate { change ->
+                println("    ${change.file}")
+            }
+
+            println("Removed input files:")
+            inputs.removed { change ->
+                println("    ${change.file}")
+            }
+        }
+
+        (new File(destinationDir, "output.txt")).withWriter('UTF-8') { writer ->
+            writer.write('Dummy output.')
+        }
+    }
+
+    @Override
+    protected void compile() {
+        throw new IllegalStateException("Should not be called")
+    }
+}
+
+task(pseudoCompile, type: PseudoCompileTask) {
+    destinationDir = new File(buildDir, "pseudoCompileTaskOutput")
+    conventionMapping.map("source", { compileTestKotlin.source })
+    conventionMapping.map("classpath", { compileTestKotlin.classpath })
+}
+
+pseudoCompile.dependsOn(compileKotlin)
+compileTestKotlin.dependsOn(pseudoCompile)
+
+test {
+    useTestNG()
+}
